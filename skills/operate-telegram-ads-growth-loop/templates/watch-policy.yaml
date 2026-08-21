@@ -1,0 +1,129 @@
+# Watch Policy Template v2.0 — Multi-Window Decision Engine
+#
+# This is the canonical watch policy attached to every campaign watch.
+# Every instance is PROJECT-SPECIFIC. Do NOT hardcode values globally.
+#
+# Key principle:
+#   «Threshold breach — это сигнал для анализа, а не команда остановить рекламу»
+
+watch_policy:
+  # ── Identification ──
+  project_id: ""
+  account_id: ""
+  ad_id: ""               # Filled after ad creation
+  campaign_id: ""
+  targeting_type: search  # search | channels | bots
+  interval_sec: 600       # Poll every 10 minutes
+
+  # ── Evidence windows ──
+  evidence_windows: [250, 500, 1000, 1500, 3000]
+
+  # ── Multi-window decision policy ──
+
+  # Minimum data requirements before ANY classification.
+  # ALL thresholds must be met simultaneously. If ANY is unmet,
+  # the engine returns insufficient_data and continues silently.
+  minimum_evidence:
+    min_impressions: 0
+    min_clicks: 0
+    min_conversions: 0
+    min_observation_windows: 1
+
+  # Persistence rules:
+  #   warning_consecutive_windows — windows before early_warning → sustained_degradation
+  #   pause_consecutive_windows   — windows before sustained_degradation → recommend_pause
+  #                                 (when combined with decision_rule criteria)
+  persistence:
+    warning_consecutive_windows: 3
+    pause_consecutive_windows: 2
+
+  # Decision rules for pause recommendation.
+  #   minimum_breached_metrics_for_pause — how many DIFFERENT metrics must be
+  #     breached for pause_consecutive_windows before recommend_pause.
+  #   allow_severe_single_metric_rule    — when True, a SINGLE metric in the
+  #     severe zone for pause_consecutive_windows is enough for recommend_pause
+  #     (provided minimum_evidence is met).
+  decision_rule:
+    minimum_breached_metrics_for_pause: 2
+    allow_severe_single_metric_rule: true
+
+  # Warning thresholds — breach at this level triggers early_warning.
+  # CPA: cost per action (lower is better). Value is the MAX acceptable.
+  # CTR: click-through rate as ratio (higher is better). Value is the MIN acceptable.
+  # CVR: conversion rate as ratio (higher is better). Value is the MIN acceptable.
+  warning_thresholds:
+    cpa: 0.0    # Cost per action max
+    ctr: 0.0    # Click-through rate min (ratio, e.g. 0.02 = 2%)
+    cvr: 0.0    # Conversion rate min (ratio, e.g. 0.30 = 30%)
+
+  # Severe thresholds — breach at this level is a stronger signal.
+  # When allow_severe_single_metric_rule is True, a single severe metric
+  # persisted for pause_consecutive_windows triggers recommend_pause.
+  severe_thresholds:
+    cpa: 0.0
+    ctr: 0.0
+    cvr: 0.0
+
+  # Baseline comparison — optional. When enabled, the engine compares
+  # current metrics against a baseline. Degradation beyond
+  # maximum_relative_degradation flags the metric as breached.
+  baseline_comparison:
+    enabled: false
+    maximum_relative_degradation: 0.5  # 50% degradation
+
+  # ── Budget limits ──
+  budget_limits:
+    total_budget: 20.0
+    max_loss: 10.0
+
+  # ── Watch flags ──
+  moderation_watch: true
+  delivery_watch: true
+  metric_watch: true
+  attribution_watch: false  # Off by default — needs downstream data
+
+  # ── Notification policy ──
+  expires_at: ""          # ISO8601 — auto-disable after
+  notify_policy:
+    material_events_only: true
+    suppress_routine: true
+    max_per_hour: 5
+
+# ── Classification Tiers ───────────────────────────────────────────
+#
+# 1. insufficient_data
+#    — minimum_evidence not met → continue silently, no report
+#
+# 2. early_warning
+#    — single-window, single-metric breach → continue observing
+#    — NOT a pause recommendation
+#
+# 3. sustained_degradation
+#    — one metric breached for warning_consecutive_windows+ windows
+#    — analytical warning, NOT mandatory pause
+#    — creates notification (material event)
+#
+# 4. recommend_pause
+#    — two+ metrics breached for pause_consecutive_windows+ windows
+#    — OR single severe metric for pause_consecutive_windows+
+#    — generates approval request (NEVER auto-stops)
+#
+# 5. Recovery
+#    — previously breached metric returns to normal → counter resets
+#    — classification returns to healthy or early_warning
+#
+# ── Example Guard Bot Defaults (project-specific, NOT global) ──────
+#
+# example_guard_watch_policy:
+#   minimum_evidence:
+#     min_clicks: 50
+#     min_observation_windows: 3
+#   persistence:
+#     warning_consecutive_windows: 3
+#     pause_consecutive_windows: 2
+#   decision_rule:
+#     minimum_breached_metrics_for_pause: 2
+#   warning_thresholds:
+#     cpa: 5.0     # Stars
+#     ctr: 0.02     # 2%
+#     cvr: 0.30     # 30%

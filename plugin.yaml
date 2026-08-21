@@ -1,0 +1,25 @@
+name: telegram-ads
+version: 0.2.0
+description: >
+  Typed ads.telegram.org tools (Playwright) plus a read-only in-process
+  watcher. Mutations go through the host approval UI (Hermes
+  Once/Session/Always/Deny). Does not include Telegram research or identity.
+author: telegram-ads
+kind: backend
+provides_tools:
+  - telegram_ads_status
+  - telegram_ads_list_ads
+  - telegram_ads_create_ad
+  - telegram_ads_watch_create
+requires_env:
+  - TELEGRAM_ADS_PHONE
+python_dependencies:
+  - playwright>=1.49
+  - pydantic>=2.6
+  - pyyaml>=6.0
+  - httpx>=0.27
+tags:
+  - telegram
+  - ads
+  - watcher
+  - playwright

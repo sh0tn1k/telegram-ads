@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "telegram-ads",
+  "description": "Telegram Ads plugin for Claude Code (local Playwright MCP, not a hosted server).",
+  "owner": {
+    "name": "telegram-ads contributors"
+  },
+  "plugins": [
+    {
+      "name": "telegram-ads",
+      "description": "Typed ads.telegram.org tools + read-only watcher via a local stdio MCP server.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Target Cluster Template
+# Output of validate_target_cluster.py
+
+project_id: ""
+cluster_id: ""
+isolation: "maximum"  # maximum | tight
+targeting_type: "channels"
+
+targets:
+  - username: ""
+    score: 0
+    classification: ""  # accept | needs_review | reject
+    hard_gate_failures: []
+
+cluster_score: 0
+cluster_verdict: ""  # ready | needs_review | rejected
+warnings: []

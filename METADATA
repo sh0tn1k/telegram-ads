@@ -1,0 +1,414 @@
+Metadata-Version: 2.4
+Name: hermes-telegram-ads
+Version: 0.1.0
+Summary: ads.telegram.org adapter for Hermes Agent — Playwright-based browser tool with internal API wrapper and safety gates
+Author: telegram-ads
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: playwright>=1.49
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: httpx>=0.27
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Dynamic: license-file
+
+# hermes-telegram-ads
+
+Production-ready Python adapter for **ads.telegram.org** — designed for the Hermes Agent.
+Built on Playwright with a wrapped JSON internal API, Pydantic types, and a safety layer
+that prevents mutating actions without explicit user confirmation.
+
+Derived from a 7-phase reverse-engineering of the site (see
+`docs/site_maps/telegram_ads/FULL_SITE_MAP.md` if available).
+
+## Status
+
+- ✅ **121/121 unit tests passing**
+- ✅ Full API coverage: 14 internal `/api?hash=<csrf>` methods + 1 multipart `/file/upload`
+- ✅ Both **TON** (Personal / Channel / Organization) and **Stars** (Bot Account) cabinets
+- ✅ Schedule encoding (Phase 5 verified), search-query base64 encoding (Phase 6 verified)
+- ✅ Two-step destructive operations with `confirm_hash`
+- ✅ Safety layer with risk levels + Confirmation tokens
+- ✅ Audit log (JSONL, token hashing)
+- ⚠ Browser tool not auto-tested (requires live Telegram login session)
+
+## Install
+
+```bash
+pip install -e ".[dev]"
+python -m playwright install chromium
+```
+
+## Quick start
+
+```python
+import asyncio
+from hermes_telegram_ads import TelegramAdsAdapter, TelegramAdsConfig
+
+async def main():
+    config = TelegramAdsConfig.from_yaml("config.yaml")  # or .default()
+    async with TelegramAdsAdapter.start(config) as ads:
+        await ads.ensure_logged_in()                      # raises if not logged in
+        accounts = await ads.list_accounts()
+        await ads.choose_account(accounts[0].account_token)
+        ads_list = await ads.list_ads()
+        for a in ads_list[:5]:
+            print(a.ad_id, a.title, a.status, a.spent, "/", a.budget)
+
+asyncio.run(main())
+```
+
+## Architecture
+
+```
+hermes_telegram_ads/
+├── adapter.py           ← TelegramAdsAdapter (public facade)
+├── api.py               ← TelegramAdsApi (POST /api?hash=<csrf>)
+├── browser.py           ← BrowserAutomationTool (Playwright wrapper)
+├── safety.py            ← Risk levels + Confirmation tokens
+├── audit.py             ← JSONL audit log
+├── config.py            ← Pydantic config (load from YAML)
+├── constants.py         ← URLs, method names, hard limits
+├── types.py             ← Pydantic models (Ad, Account, Event, ...)
+├── errors.py            ← Typed exceptions
+├── selectors.yaml       ← CSS selectors with versioning
+├── parser.py            ← parse_money, parse_int, extract_*
+├── payloads.py          ← schedule encoding, search-query base64, draft → payload
+├── media.py             ← multipart /file/upload (aspect-ratio 16:9 hard limit)
+├── reports.py           ← CSV download via session cookies
+└── pages/
+    ├── account.py       ← /account, account-switcher dropdown
+    ├── ad_detail.py     ← /account/ad/<id>
+    ├── ad_stats.py      ← /account/ad/<id>/stats
+    ├── budget.py        ← /account/budget + transactions
+    ├── events.py        ← /account/events + pixel snippets
+    └── profile.py       ← /account/edit
+```
+
+## Public action methods (all on `TelegramAdsAdapter`)
+
+### Read (no confirmation needed)
+
+| Method | Returns |
+|---|---|
+| `open_dashboard()` | navigates to `/account`, returns URL |
+| `ensure_logged_in()` | raises `LoginRequiredError` if not authed |
+| `list_accounts()` | `list[Account]` (all cabinets accessible) |
+| `get_current_account()` | `Account \| None` |
+| `list_ads()` | `list[AdSummary]` (homepage table) |
+| `get_ad(ad_id)` | `AdDetail` (Info tab) |
+| `get_ad_stats(ad_id)` | `AdStats` (charts + monthly table) |
+| `get_account_budget()` | `AccountBudget` (balance + tx history) |
+| `get_account_stats()` | account-level Statistics page snapshot |
+| `get_profile()` | `ProfileInfo` |
+| `list_events()` | `list[Event]` (Stars only) |
+| `get_pixel_base_snippet()` | `PixelSnippet \| None` |
+| `get_event_setup_snippet(event_id)` | per-event snippet |
+| `get_event_log(event_id)` | `EventLog` (last 8h, 100 entries) |
+| `get_share_stats_url(ad_id)` | public stats URL |
+| `validate_ad(draft)` | `checkAdPost` result (live validation) |
+
+### Draft (no irreversible effect)
+
+| Method | Notes |
+|---|---|
+| `save_ad_draft(draft)` | saves form draft on server |
+| `prepare_ad_draft(draft)` | save + validate + preview screenshot |
+| `upload_media(file_path)` | returns media token (16:9 required) |
+| `create_similar_draft(source_ad_id)` | clones ad → draft |
+| `screenshot(name=None)` | takes screenshot, returns path |
+
+### Mutating (require Confirmation)
+
+All mutating actions return `ConfirmationRequiredError` unless caller passes a
+valid `confirmation_id`. Issue confirmation first, surface details to the user,
+then call the action with the id.
+
+```python
+draft = CreateAdDraft(...)
+conf = ads.issue_create_ad_confirmation(draft, note="for user review")
+# ↑ Skill/UI surfaces conf details to the human, gets explicit yes.
+await ads.create_ad(draft, confirmation_id=conf.id)
+```
+
+| Method | Risk | Helper to issue confirmation |
+|---|---|---|
+| `create_ad(draft, confirmation_id)` | CONFIRM | `issue_create_ad_confirmation(draft)` |
+| `edit_ad(EditAdDraft, confirmation_id)` | CONFIRM | `issue_edit_ad_confirmation(draft)` |
+| `change_cpm(ad_id, cpm, confirmation_id)` | CONFIRM | `issue_change_cpm_confirmation(ad_id, cpm)` |
+| `change_status(ad_id, active, confirmation_id)` | CONFIRM | `issue_change_status_confirmation(ad_id, active=...)` |
+| `add_to_budget(ad_id, amount, confirmation_id)` | CONFIRM | `issue_add_budget_confirmation(ad_id, amount)` |
+| `withdraw_from_budget(ad_id, amount, confirmation_id)` | CONFIRM | `issue_withdraw_budget_confirmation(ad_id, amount)` |
+| `create_event(title, event_type, confirmation_id)` | CONFIRM | `issue_create_event_confirmation(title, event_type)` |
+
+### Mutating + double confirmation
+
+```python
+c1, c2 = ads.issue_delete_ad_confirmations(ad_id=11)
+await ads.delete_ad(ad_id=11, confirmation_id=c1.id, second_confirmation_id=c2.id)
+```
+
+| Method | Helper |
+|---|---|
+| `delete_ad(ad_id, ...)` | `issue_delete_ad_confirmations(ad_id)` |
+| `delete_event(event_id, ...)` | `issue_delete_event_confirmations(event_id)` |
+| `revoke_share_stats_url(ad_id, ...)` | `issue_revoke_stats_url_confirmations(ad_id)` |
+
+### Forbidden by default
+
+These require deliberate config opt-in (and are not exposed as methods yet):
+
+- `transferStars` — permanent transfer of bot Stars to ad account
+- external Fragment payment initiation
+- `createPixel` (first-time pixel creation, untested)
+- `editEvent` / `renameEvent` (not in spec)
+
+## Confirmation lifecycle
+
+```
+1. Skill builds the action's params.
+2. Skill calls `issue_*_confirmation(...)` → gets a Confirmation object.
+3. Skill surfaces Confirmation.id, action, params_fingerprint to user.
+4. User says yes / no.
+5. If yes — pass id back to the action method.
+6. Adapter consumes the confirmation atomically (one-shot).
+7. Re-using the id, expired (default TTL 5 min), or modifying params
+   between issue and consume raises InvalidConfirmationError.
+```
+
+## Geo / cabinet rules (hard)
+
+- **TON cabinet** cannot reach users with phone country codes **RU / UA / IL / PS**.
+  Calling `safety.check_ton_geo_safe({"RU", ...})` raises `GeoTargetingError`.
+- **Stars cabinet** has no such restriction (it's Telegram's internal currency).
+- For RU/UA/IL/PS audience — use Stars (Bot Account) cabinet only.
+- Stars are NOT bought — they accumulate from your bot's Stars revenue, then
+  transferred (permanently) into the ad account.
+
+## Login
+
+Login is **manual**. Telegram requires a confirmation tap inside the Telegram
+app — the adapter intentionally has no auto-confirm flow.
+
+First-time setup:
+1. Run any example or `ensure_logged_in()`.
+2. Browser opens `https://ads.telegram.org`.
+3. Enter your phone, confirm in Telegram.
+4. Cookies persist in `browser.profile_dir` for future runs.
+
+## Configuration
+
+See [`config.example.yaml`](./config.example.yaml). Load with:
+
+```python
+config = TelegramAdsConfig.from_yaml("path/to/config.yaml")
+```
+
+Or programmatically:
+
+```python
+from hermes_telegram_ads.config import TelegramAdsConfig, BrowserConfig
+
+config = TelegramAdsConfig(browser=BrowserConfig(headless=True))
+config.ensure_paths()
+```
+
+## Audit log
+
+All actions are logged to JSONL (default `./logs/telegram_ads_audit.jsonl`).
+`account_token` is SHA-256 truncated by default (`hash_account_tokens: true`).
+Sensitive blobs (`raw_response`, `html`) are excluded.
+
+Example entry:
+```json
+{
+  "time": "2026-05-28T12:00:00+00:00",
+  "tool": "telegram_ads",
+  "action": "editAdCPM",
+  "risk_level": "confirm_required",
+  "result_status": "ok",
+  "account_token_hash": "sha256:0000000000000000",
+  "confirmation_id": "11111111-2222-...",
+  "ad_id": 11,
+  "cpm": 0.41
+}
+```
+
+## Internal API spec
+
+```
+POST https://ads.telegram.org/api?hash=<csrf>
+Content-Type: application/x-www-form-urlencoded
+X-Requested-With: XMLHttpRequest
+Cookie: <session cookie>
+
+owner_id=<account_token>&<params>&method=<methodName>
+```
+
+| Method | Wrapper | Returns |
+|---|---|---|
+| `searchChannel` | `api.search_channel(query, field)` | `{ok, channel}` |
+| `checkAdPost` | `api.check_ad_post(payload)` | `{field, error, preview_data}` |
+| `createAd` | `api.create_ad(payload)` | `{ok, redirect_to}` |
+| `saveAdDraft` | `api.save_ad_draft(payload)` | `{ok}` |
+| `createDraftFromAd` | `api.create_draft_from_ad(ad_id)` | `{ok, redirect_to}` |
+| `editAd` | `api.edit_ad(payload)` | `{ok, redirect_to}` |
+| `editAdCPM` ⚠ uppercase | `api.edit_ad_cpm(ad_id, cpm)` | `{ok, ad}` |
+| `editAdStatus` | `api.edit_ad_status(ad_id, active)` | `{ok, ad}` |
+| `incrAdBudget` | `api.incr_ad_budget(ad_id, amount)` | `{ok, ad}` |
+| `decrAdBudget` ⚠ param `amount` | `api.decr_ad_budget(ad_id, amount)` | `{ok, ad}` |
+| `createEvent` | `api.create_event(title, type)` | `{ok, event, ...}` |
+| `deleteEvent` (2-step) | `api.delete_event_full(event_id)` | `{ok, redirect_to}` |
+| `deleteAd` (2-step) | `api.delete_ad_full(ad_id)` | `{ok, redirect_to}` |
+| `revokeStatsUrl` | `api.revoke_stats_url(ad_id)` | `{ok, new_url, toast}` |
+| `POST /file/upload` (multipart) | `api.upload_media(file_path)` | `{ok, media}` |
+
+Bootstrap is lazy; auto-re-bootstrap on CSRF rotation. Call
+`api.rebootstrap()` explicitly after `choose_account()` (owner_id changes).
+
+## Hard constraints baked into adapter
+
+- Text ≤ 160 chars (raises `PolicyViolationError`)
+- Max 1 inline link in text; only `@`/`t.me/` formats
+- No URL shorteners, no IP addresses in URL
+- `incrAdBudget`: budget after add ≥ 1.00 TON (server-enforced; surfaced as error)
+- `decrAdBudget`: 2-minute cooldown after `editAdStatus` toggle
+- Media upload: aspect ratio 16:9 (local pre-check + server-enforced)
+- Targeting immutable after `createAd` — use `create_similar_draft`
+- Conversion Event immutable after first save with it
+- Telegram login is manual — adapter will never auto-enter codes
+
+## Testing
+
+```bash
+pytest                  # 121 tests, ~0.7s
+pytest -k payloads      # schedule encoding + base64 query
+pytest -k safety        # confirmation gates + policy checks
+```
+
+Tests don't need Playwright/browser — they validate against captured fixtures
+in `tests/fixtures/` (real Phase 4-7 API responses and form bodies).
+
+## Examples
+
+- [`examples/01_read_only.py`](./examples/01_read_only.py) — list accounts + ads
+- [`examples/02_validate_and_draft.py`](./examples/02_validate_and_draft.py) — build draft, validate, screenshot (no submit)
+- [`examples/03_change_cpm_with_confirm.py`](./examples/03_change_cpm_with_confirm.py) — full confirmation flow
+
+## Known gaps
+
+These were not closed during 7-phase discovery. Adapter does not implement
+them; if needed, capture live first then implement:
+
+- `editEvent` / `renameEvent` — pixel event rename
+- `createPixel` — first-time pixel creation (current cabinet already has one)
+- `transferStars` — Stars top-up from bot balance (forbidden by default)
+- `editAdSchedule` (might be subsumed by `editAd`)
+- `editAdConversionEvent` (might be subsumed by `editAd`)
+- Channel-cabinet and Organization-cabinet specifics
+- Stars cabinet: exact min CPM, semantics of `+N%` CPM indicator
+- Pixel availability geo-rules for advertiser
+- Tough-decline UI lock state (not reproduced)
+
+## Integration with Hermes
+
+Adapter is a Python library — Hermes imports and calls async methods directly.
+
+```python
+# In your Hermes setup
+from hermes_telegram_ads import TelegramAdsAdapter, TelegramAdsConfig
+
+class HermesTelegramAdsTool:
+    def __init__(self):
+        self._adapter: TelegramAdsAdapter | None = None
+
+    async def init(self, config_path: str):
+        config = TelegramAdsConfig.from_yaml(config_path)
+        self._adapter = await TelegramAdsAdapter.launch(config)
+
+    async def shutdown(self):
+        if self._adapter:
+            await self._adapter.close()
+
+    # ... register methods with Hermes's tool registry
+```
+
+Register tool actions in your Hermes registry by their public method names:
+
+```
+telegram_ads.list_accounts
+telegram_ads.list_ads
+telegram_ads.get_ad
+telegram_ads.validate_ad
+telegram_ads.prepare_ad_draft
+telegram_ads.create_ad                  # requires confirmation_id
+telegram_ads.change_cpm                 # requires confirmation_id
+telegram_ads.change_status              # requires confirmation_id
+telegram_ads.add_to_budget              # requires confirmation_id
+telegram_ads.withdraw_from_budget       # requires confirmation_id
+telegram_ads.create_similar_draft
+telegram_ads.upload_media
+telegram_ads.delete_ad                  # double confirmation
+telegram_ads.delete_event               # double confirmation
+telegram_ads.revoke_share_stats_url     # double confirmation
+telegram_ads.download_ad_report
+telegram_ads.download_account_report
+```
+
+`TelegramAdsAdapter.get_action_risk(action_name)` returns the required risk
+level for any action — useful for Hermes to know if confirmation is needed
+before calling.
+
+## Watcher — scheduled read-only monitoring
+
+[`hermes_telegram_ads/watcher/`](./hermes_telegram_ads/watcher/) adds a
+deterministic monitoring layer so Hermes can track campaign status,
+moderation, budgets, and balances **without an AI in the polling loop** and
+**without any mutating Telegram Ads action**. It polls Telegram Ads read-only on
+a schedule, stores snapshots in a local SQLite DB, diffs them, and emits internal
+`WatcherEvent`s for Hermes to consume.
+
+```python
+from hermes_telegram_ads.watcher import SQLiteWatcherStore, TelegramAdsWatcherService
+
+store = SQLiteWatcherStore()                       # ~/.hermes/telegram_ads_watcher.db
+service = TelegramAdsWatcherService(adapter=ads, store=store, project_id="opusclips")
+
+await service.create_watch(kind="moderation_result", ad_id=123, interval_sec=600)
+events = await service.run_due_watches()           # read-only; never mutates
+unconsumed = await service.list_events(unconsumed=True)
+```
+
+It covers the **full Telegram Ads tool surface** (all 62 `telegram_ads_*`
+capabilities): every read-only capability has a watch kind (status/login,
+accounts, balances, campaign list/detail/status, stats, reports, share stats,
+rejection info, targeting, validation) and every *mutating* capability is
+**forbidden inside the watcher** — instead the watcher verifies the observable
+result after Hermes runs the approved action:
+
+```python
+# After Hermes executed an approved change_cpm to 0.55 on ad 123:
+await service.create_post_action_watches("change_cpm", ad_id=123, expected={"cpm": 0.55})
+# → read-only watches that emit cpm_changed + post_action_verified.
+```
+
+Exports: `SQLiteWatcherStore`, `TelegramAdsWatcherService`, `WatcherScheduler`,
+`WatchSpec`, `AdSnapshot`, `AccountSnapshot`, `ResourceSnapshot`, `WatcherEvent`,
+`ToolCoverage`, `list_tool_coverage`, `create_post_action_watches`. The watcher
+only calls the adapter's read methods (`get_ad`, `get_ad_stats`,
+`get_account_budget`, `get_account_stats`, `list_ads`, `list_accounts`,
+`get_share_stats_url`, `validate_ad`, `detect_login_state`); every mutation stays
+on the confirmation-gated adapter methods above. No CLI, no Telegram bot
+commands, no Redis/Kafka/Celery/Postgres — just stdlib `sqlite3`. See
+[`docs/WATCHER.md`](./docs/WATCHER.md) and the
+[coverage matrix](./docs/WATCHER_COVERAGE.md).
+
+## License
+
+Proprietary.

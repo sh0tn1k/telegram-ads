@@ -1,0 +1,19 @@
+# Notification Authorization Template
+
+notification_authorization:
+  authorization_id: ""    # UUID
+  destination: ""         # telegram:chat_id
+  allowed_projects: []    # Empty = none allowed
+  allowed_event_types:    # Which events to notify
+    - moderation_approved
+    - budget_80_percent
+    - action_requiring_approval
+  minimum_severity: warning  # info | warning | error | critical
+  max_messages_per_hour: 5
+  max_messages_per_day: 20
+  valid_from: ""          # ISO8601
+  valid_until: ""         # ISO8601 (leave empty for indefinite)
+  revocable: true
+  redact_secrets: true
+  excluded_actions: []    # Never notify for these
+  audit_log_required: true

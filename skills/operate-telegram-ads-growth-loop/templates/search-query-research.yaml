@@ -1,0 +1,17 @@
+# Search Query Research Template
+# Fill before running validate_search_queries.py
+
+project_id: ""
+language: "en"  # en | ru | ...
+geo: ""  # US | UK | CA | AU | GLOBAL
+intent_level: ""  # direct_problem | workflow_tools | ...
+
+queries:
+  - raw: ""
+    expected_intent: ""
+    notes: ""
+
+evidence:
+  telegram_search_screenshot: false
+  competitor_ads_observed: false
+  estimated_search_volume: "unknown"

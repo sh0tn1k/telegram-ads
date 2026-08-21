@@ -1,0 +1,22 @@
+# Target Research Template
+# Fill before running validate_target_cluster.py
+
+project_id: ""
+ad_id: ""
+targeting_type: "channels"  # channels | bots
+
+candidates:
+  - username: ""
+    type: "channel"  # channel | bot
+    language: ""
+    geo: ""
+    subscribers: 0
+    audience_fit_score: 0
+    research_notes: ""
+
+cluster:
+  isolation: "maximum"  # maximum | tight
+  max_targets: 10
+  audience_shared: false
+  language_shared: false
+  geo_shared: false

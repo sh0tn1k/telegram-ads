@@ -1,0 +1,480 @@
+# Selectors for ads.telegram.org
+# Extracted from FULL_SITE_MAP.md (Phase 1-7 discovery).
+# All selectors here are stable hooks (pr-* / js-* / explicit name=).
+# Versioned via `version` field for future migrations.
+
+version: 1
+generated_at: "2026-05-28"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Public pages
+# ═════════════════════════════════════════════════════════════════════════════
+
+landing:
+  url_path: "/"
+  login_button: "a.pr-btn.login-link"
+
+login_panel:
+  heading_text: "Log In"
+  phone_input: "input[placeholder='+12223334455']"
+  next_button: "button:has-text('Next')"
+  cancel_link: "*:has-text('Cancel')"
+
+# Login funnel signals for the deterministic state machine (login_flow.py).
+# `logged_in` reuses header.account_name_label (verified). `phone_input`
+# reuses the login_panel placeholder (from site-map discovery). `code_input`
+# and `app_approval` are INFERRED from the standard Telegram login widget and
+# are matched defensively (multiple candidate hooks); detection defaults to a
+# conservative human-login state when uncertain — it never asserts logged-in.
+auth_flow:
+  # A human is logged in iff the authed header account-name label is present.
+  logged_in_marker: "span.pr-header-account-name"
+  # Phone-number entry (either the public login panel or the profile-style input).
+  phone_inputs:
+    - "input[placeholder='+12223334455']"
+    - "input[name='phone_number'][type='tel']"
+    - "input[type='tel']"
+  # OTP / login-code entry — manual, human-only. Never auto-filled.
+  code_inputs:
+    - "input[name='code']"
+    - "input[autocomplete='one-time-code']"
+    - "input[inputmode='numeric'][maxlength='5']"
+  # "Confirm this login in your Telegram app" prompt (text-based, defensive).
+  app_approval_markers:
+    - "text=/confirm.*telegram app/i"
+    - "text=/open telegram on your phone/i"
+    - "text=/confirm access via telegram/i"
+    - "text=/we've just sent you a message/i"
+    - "text=/please confirm access/i"
+    - ".login-app-confirm"
+  # URL substrings that indicate we are NOT inside the authed cabinet.
+  auth_url_substrings:
+    - "/auth"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Account picker
+# ═════════════════════════════════════════════════════════════════════════════
+
+choose_account:
+  url_path: "/choose_account"
+  account_card: "a.pr-account-button-wrap"
+  account_dropdown_item: "a.pr-dropdown-item"
+  create_org_link: "a[href='/choose_account/new']"
+  stars_prefix: "⭐️"  # presence in label = Stars (Bot Account)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Header / navigation (when authed)
+# ═════════════════════════════════════════════════════════════════════════════
+
+header:
+  budget_link: "a.pr-link[href='/account/budget']"
+  budget_text_node: ".js-header_owner_budget"
+  account_dropdown_trigger: "span.pr-dropdown-wrap span.pr-dropdown.dropdown-toggle"
+  account_dropdown_open: "span.pr-dropdown-wrap.open"
+  account_dropdown_menu: "span.pr-dropdown-wrap.open ul.dropdown-menu"
+  account_name_label: "span.pr-header-account-name"
+  account_photo_img: ".pr-auth-photo img"
+  currency_ton: "span.amount-currency.currency-ton"
+  currency_ton_icon: "svg.currency-ton-icon"
+  currency_stars: "span.amount-currency.currency-stars"
+  currency_stars_icon: "svg.currency-stars-icon"
+
+account_menu_items:
+  edit_account: "a.pr-dropdown-item.pr-edit-icon[href='/account/edit']"
+  create_organization: "a.pr-dropdown-item.pr-org-icon[href='/choose_account/new']"
+  manage_events: "a.pr-dropdown-item.pr-events-icon[href='/account/events']"  # Stars only
+  help: "a.pr-dropdown-item.pr-help-icon[href='/getting-started']"
+  log_out: "a.pr-dropdown-item.pr-quit-icon.logout-link"
+  switch_account_items: "li a.pr-dropdown-item[href^='/choose_account/']"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# /account — homepage with ads table
+# ═════════════════════════════════════════════════════════════════════════════
+
+account_homepage:
+  url_path: "/account"
+  search_box: "input[type='search'][placeholder*='Search']"
+  manage_budget_btn: "a.btn.pr-btn[href='/account/budget']"
+  create_ad_btn: "a.btn.pr-btn[href='/account/ad/new']"
+  ads_table: "table.pr-table.pr-table-sticky"
+  row: "tbody tr"
+  link_to_ad: "a.pr-link[href^='/account/ad/']"
+  link_to_stats: "a.pr-link[href$='/stats']"
+  link_to_edit_cpm: "a[href$='/edit_cpm']"
+  link_to_edit_budget: "a[href$='/edit_budget']"
+  link_to_edit_status: "a[href$='/edit_status']"
+  status_declined_class: "a.ad-declined"
+
+column_toggler:
+  popup_container: ".js-table-columns-popup"
+  checkbox_fields:  # checkbox name attr in popup form
+    - views
+    - opens
+    - clicks
+    - actions
+    - ctr
+    - cvr
+    - cpm
+    - cpc
+    - cpa
+    - spent
+    - budget
+    - target
+    - url
+    - action
+    - status
+    - date
+
+# ═════════════════════════════════════════════════════════════════════════════
+# /account/ad/new + /account/ad/<id> — create / edit form
+# ═════════════════════════════════════════════════════════════════════════════
+
+ad_form:
+  fields:
+    title: "input[name='title']"
+    text: "textarea[name='text']"
+    promote_url: "input[name='promote_url']"
+    website_photo_hidden: "input[name='website_photo']"
+    website_name: "input[name='website_name']"
+    show_picture: "input[name='picture'][type='checkbox']"
+    media_hidden: "input[name='media'][type='hidden']"
+    ad_info: "textarea[name='ad_info']"  # may be absent in default form
+    cpm: "input[name='cpm']"
+    budget: "input[name='budget']"  # only on /account/ad/new (create), not on edit
+    daily_budget: "input[name='daily_budget']"
+    views_per_user_radio: "input[name='views_per_user'][value='{value}']"  # {value}=1..4
+    active_radio: "input[name='active'][value='{value}']"  # {value}=0|1
+    activate_date: "input[name='ad_activate_date'][type='date']"
+    activate_time: "input[name='ad_activate_time'][type='time']"
+    deactivate_date: "input[name='ad_deactivate_date'][type='date']"
+    deactivate_time: "input[name='ad_deactivate_time'][type='time']"
+    use_schedule: "input[name='use_schedule'][type='checkbox']"
+    schedule_hidden: "input[name='schedule'][type='hidden']"
+    schedule_tz: "input[name='schedule_tz']"
+    schedule_tz_custom: "input[name='schedule_tz_custom']"
+    target_type_radio: "input[name='target_type'][value='{value}']"  # search|bots|channels
+    confirmed_checkbox: "input[name='confirmed'][type='checkbox']"
+    owner_id_hidden: "input[name='owner_id'][type='hidden']"
+  buttons:
+    create: "button.create-new-ad-btn"     # "Create Ad"
+    save_changes: "button.edit-ad-btn"     # "Save Changes"
+    delete_ad: "button.delete-ad-btn"      # "Delete Ad"
+    clear_draft: "*:has-text('Clear Draft')"
+    upload_media: ".js-add-media-btn"      # tag may be <a> or <button> after re-render
+    create_similar: "a.pr-form-link.js-clone-ad-btn"
+  hints:
+    text_emoji_helper: "@AdsMarkdownBot"
+    re_review_footer: "Changes will become visible to users once they are approved"
+
+# ─── Targeting chip-input ────────────────────────────────────────────────────
+
+target_tabs:
+  container: ".pr-target-tabs"
+  prefix_label: ".pr-target-tabs-prefix"
+  radio_template: "input[name='target_type'][value='{value}']"
+
+target_panels:
+  container_template: ".pr-target-options[data-value='{type}']"  # type=channels|bots|search
+  visible_class: "visible"
+
+target_chip_input:
+  select_container_template: ".pr-target-options.visible .select[data-name='{field}']"
+  field_names:
+    channels: "channels"
+    bots: "bots"
+    search: "search_queries"
+  selected_items_wrap: ".selected-items"
+  chip: ".selected-item[data-val]"
+  chip_label: ".selected-item .label"
+  chip_photo_img: ".selected-item .selected-item-photo img"
+  chip_close_btn: ".selected-item .close"
+  text_input: ".input[contenteditable='true']"
+  autocomplete_list: ".items-list"
+  autocomplete_hidden_class: "ohide"
+  deselect_all_link: ".pr-form-link.js-deselect-all"
+  similar_link_channels: "a.js-field-similar_channels"
+  similar_link_bots: "a.js-field-similar_bots"
+  overview_block: ".pr-target-overview"
+  placeholders:
+    channels: "t.me channel URL"
+    bots: "t.me bot URL"
+    search_queries: "Add search queries"
+  commit_key: "Enter"
+  notes: |
+    text_input is contenteditable, NOT <input>.
+    Use pressSequentially + Enter to commit chip.
+
+# ─── Schedule popup ──────────────────────────────────────────────────────────
+
+schedule_popup:
+  trigger_checkbox: "input[name='use_schedule']"
+  container: "section.pr-layer-schedule-popup"
+  header_text: "Ad Schedule"
+  hidden_input: "input[name='schedule']"
+  weekday_labels_table: ".js-schedule-table-weeks"
+  hour_labels_table: ".js-schedule-table-hours"
+  cells_table: "table.js-schedule-table"
+  cell_template: "table.js-schedule-table tr:nth-child({day_idx_plus_1}) td:nth-child({hour_plus_1})"
+  cell_selected_class: "selected"
+  clear_btn: ".js-clear-schedule"
+  overview_block: ".js-schedule-overview"
+  tz_custom_radio: "input[name='schedule_tz_custom']"
+  tz_hidden_input: "input[name='schedule_tz']"
+  cancel_btn: ".pr-layer-schedule-popup .popup-cancel-btn"
+
+# ─── Conversion event field (Stars website ads only) ─────────────────────────
+
+conversion_event_field:
+  trigger_condition: "promote_url starts with http(s)://"
+  label_text: "Conversion event"
+  label_hint: "Select which action you want the user to take on your website."
+  shortcut_create_link: "a.pr-form-link[href='/account/event/new'][data-layer]"
+  select_container: "div.select[data-name='conversion_event']"
+  text_input: ".select[data-name='conversion_event'] .input[contenteditable]"
+  placeholder: "Select event or create a new one (optional)"
+  options_list: ".select[data-name='conversion_event'] .items-list .search-item"
+  option_label: ".search-item .select-list-item"
+  option_index_attr: "data-i"
+  submitted_field_name: "conversion_event"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Ad budget form (/account/ad/<id>/budget)
+# ═════════════════════════════════════════════════════════════════════════════
+
+ad_budget_form:
+  form: "form.pr-incr-budget-form.incr-decr-form"
+  owner_id_hidden: "form.pr-incr-budget-form input[name='owner_id'][type='hidden']"
+  ad_id_hidden: "form.pr-incr-budget-form input[name='ad_id'][type='hidden']"
+  incr_group: "div.incr-group"  # visible by default
+  incr_amount_input: ".incr-group input[name='amount'].js-amount-input"
+  incr_submit_btn: ".incr-group button.submit-form-btn"  # "Add to budget"
+  decr_group: "div.decr-group"  # hidden by display:none
+  decr_amount_input: ".decr-group input[name='decr_amount'].js-amount-input"
+  decr_submit_btn: ".decr-group button.submit-form-btn"  # "Withdraw from budget"
+  toggle_link: "a.pr-form-link.js-toggle-sign"  # "decrease budget" / "increase budget"
+  toggle_disabled_class: "disabled"
+  transactions_table: "table.pr-table.pr-table-sticky"
+  notes: |
+    decr-group is hidden by default. API param is `amount` (NOT `decr_amount` like
+    the HTML field name — JS converts). Easier to call decrAdBudget directly via API.
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Account budget (/account/budget)
+# ═════════════════════════════════════════════════════════════════════════════
+
+account_budget:
+  url_path: "/account/budget"
+  current_balance: ".pr-owner-balance-value, .js-header_owner_budget"
+  add_funds_btn_ton: "a.btn.pr-btn[href*='fragment.com/ads/pay']"  # external Fragment
+  add_funds_btn_stars: "a.btn.pr-btn[href='/account/budget/add_stars']"  # internal modal
+  transactions_table: "table.pr-table.pr-table-sticky"
+  tabs:
+    info: "a[href='/account/edit']"
+    budget: "a[href='/account/budget']"
+    statistics: "a[href='/account/stats']"
+
+add_stars_modal:
+  url_path: "/account/budget/add_stars"
+  container: "section.pr-layer-edit-budget"
+  bot_balance_display: ".pr-layer-subheader .amount-currency.currency-stars"
+  amount_input: "input.js-amount-input[name='amount']"
+  owner_id_hidden: "section.pr-layer-edit-budget input[name='owner_id'][type='hidden']"
+  submit_btn: ".popup-button.submit-form-btn"  # "Add stars to budget"
+  cancel_btn: ".popup-button.popup-cancel-btn"
+  hint_text: "This will permanently transfer Stars from your bot's Star balance"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Account statistics (/account/stats)
+# ═════════════════════════════════════════════════════════════════════════════
+
+account_stats:
+  url_path: "/account/stats"
+  count_chart: "#chart_count_stats_wrap"
+  budget_chart: "#chart_budget_stats_wrap"
+  switchers: ".tchart--switcher"
+  reports_table: "table.pr-table"
+  reports_columns: [ad_id, ad_title, views, amount]
+  csv_link: "a.csv_link"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Ad detail (/account/ad/<id>) tabs
+# ═════════════════════════════════════════════════════════════════════════════
+
+ad_detail:
+  url_path_template: "/account/ad/{id}"
+  tabs:
+    info: "a[href$='/account/ad/{id}']"
+    budget: "a[href='/account/ad/{id}/budget']"
+    statistics: "a[href='/account/ad/{id}/stats']"
+  preview_block: ".pr-preview-ad-wrap"
+  preview_text: ".pr-preview-ad-message .js-preview-text"
+  preview_button: ".pr-preview-ad-message .js-preview-button"
+  similar_link: "a.pr-form-link.js-clone-ad-btn"
+  delete_link: "button.delete-ad-btn"
+
+declined_ad:
+  decline_block: ".pr-decline-block"
+  decline_header: ".pr-decline-block-header"
+  decline_reason_category: ".pr-decline-reason"
+  decline_reason_desc: ".pr-decline-reason-desc"
+  read_more_link: ".pr-decline-reason-desc a"
+  resubmit_btn: "button.edit-ad-btn"
+  homepage_status_link: "a.ad-declined"
+  note: |
+    .pr-decline-block may disappear after edits even if status=Declined in homepage.
+    Source of truth for status: homepage table or API ad object.
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Ad statistics (/account/ad/<id>/stats)
+# ═════════════════════════════════════════════════════════════════════════════
+
+ad_stats:
+  url_path_template: "/account/ad/{id}/stats"
+  count_chart: "#chart_count_stats_wrap"
+  budget_chart: "#chart_budget_stats_wrap"
+  granularity_switcher: ".tchart--switcher"
+  csv_link: "a.csv_link"
+  share_stats_btn: "a.pr-link-btn[href$='/stats/share'][data-layer]"
+  reports_table: "table.pr-table"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Share Stats popup (/account/ad/<id>/stats/share)
+# ═════════════════════════════════════════════════════════════════════════════
+
+share_stats_popup:
+  url_path_template: "/account/ad/{id}/stats/share"
+  container: "section.pr-layer-share-stats"
+  header_text: "Share Statistics"
+  url_input: "input.js-share-url[readonly]"
+  copy_btn: ".popup-button.js-copy-link"
+  revoke_btn: ".popup-button.js-revoke-link"
+  close_btn: ".popup-button.popup-cancel-btn"
+  public_url_pattern: "https://ads.telegram.org/stats/{share_token}"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Events Manager (Stars cabinet only)
+# ═════════════════════════════════════════════════════════════════════════════
+
+events_manager:
+  url_path: "/account/events"
+  setup_pixel_btn: "a.btn.pr-btn[href='/account/events/setup']"
+  add_event_btn: "a.btn.pr-btn[href='/account/event/new']"
+  events_table: "table.pr-table"
+  row: "tbody tr"
+  row_columns:
+    name: "td:nth-child(1)"
+    type: "td:nth-child(2)"
+    status: "td:nth-child(3)"  # "Active" / "Inactive"
+    used_in: "td:nth-child(4)"
+    actions: "td:nth-child(5)"
+  actions_dropdown: ".pr-dropdown[data-event-id]"
+  action_setup_link_template: "a[href='/account/event/{id}/setup']"
+  action_log_link_template: "a[href='/account/event/{id}/log']"
+
+pixel_setup_popup:
+  url_path: "/account/events/setup"
+  container: "section.pr-layer-popup"
+  copy_btn: "a.pr-form-link.js-copy-field-btn"
+  code_textarea: "textarea.code-sample"
+  hint_link: "a[href='https://ads.telegram.org/docs/pixel']"
+
+event_new_popup:
+  url_path: "/account/event/new"
+  container: "section.pr-layer-edit-title"
+  header_text: "New Event"
+  title_input: "input[name='title']"
+  type_dropdown_toggle: "a.dropdown-toggle[data-name='type']"
+  type_options: "ul.dropdown-menu li a.input-dropdown-item"
+  type_option_attr: "data-value"
+  save_btn: ".popup-button.submit-form-btn"
+  cancel_btn: ".popup-button.popup-cancel-btn"
+
+event_setup_popup:
+  url_path_template: "/account/event/{id}/setup"
+  container: "section.pr-layer-popup"
+  base_code_textarea: ".form-group:has(:text('Install base pixel')) textarea.code-sample"
+  event_code_textarea: ".form-group:has(:text('Add event code')) textarea.code-sample"
+  notes: |
+    Auto-events (Page views, Landing views) only show step 1 (base pixel).
+    Custom events show step 2 with event-specific snippet.
+
+event_log_popup:
+  url_path_template: "/account/event/{id}/log"
+  container: "section.pr-layer-popup"
+  table: "table.pr-table"
+  columns: [event_time, domain]
+  max_rows: 100
+  window_hours: 8
+  empty_text: "No recent activity found."
+
+# ═════════════════════════════════════════════════════════════════════════════
+# /account/edit — profile
+# ═════════════════════════════════════════════════════════════════════════════
+
+profile_edit:
+  url_path: "/account/edit"
+  fields:
+    account_id_readonly: "input[type='text'][value^='ACC']"
+    full_name: "input[name='full_name']"  # required for DSA EU
+    email: "input[name='email']"
+    phone_number: "input[name='phone_number'][type='tel']"
+    country: "input[name='country']"  # ISO-2
+    city: "input[name='city']"
+    ad_info: "textarea[name='ad_info']"
+  save_btn: "button:has-text('Save Info')"
+  dsa_notice: "If your ads will be shown to EU users"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Media upload
+# ═════════════════════════════════════════════════════════════════════════════
+
+media_upload:
+  trigger_btn: ".js-add-media-btn"  # <a> or <button>
+  endpoint: "POST /file/upload"
+  content_type: "multipart/form-data"
+  hidden_token_field: "input[name='media'][type='hidden']"
+  preview_wrap: ".js-ad-media-wrap"
+  change_btn_text: "Change Media"
+  upload_btn_text: "Upload Photo or Video"
+  remove_btn: ".js-ad-media-remove"
+  play_btn: ".js-ad-media-play"
+  duration_label: ".js-ad-media-duration"
+  validation:
+    aspect_ratio: [16, 9]
+    max_size_bytes: null  # TBD
+    formats: null  # TBD
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Generic popup helpers
+# ═════════════════════════════════════════════════════════════════════════════
+
+popup:
+  container: ".popup-container.aj_popup"
+  cancel_btn: ".popup-button.popup-cancel-btn"
+  submit_btn: ".popup-button.submit-form-btn"
+  close_class: "hide"
+  data_layer_attr: "data-layer"  # presence on <a> = open as popup overlay
+  data_layer_used_for:
+    - "/account/ad/<id>/stats/share"
+    - "/account/event/new"
+    - "/account/event/<id>/setup"
+    - "/account/event/<id>/log"
+    - "/account/events/setup"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# JS globals (for evaluate() calls)
+# ═════════════════════════════════════════════════════════════════════════════
+
+js_globals:
+  aj_api_url: "window.Aj.state.apiUrl"  # /api?hash=<csrf>
+  aj_owner_id: "window.Aj.state.ownerId"  # account_token
+  aj_event_id: "window.Aj.state.eventId"
+  aj_api_request: "window.Aj.apiRequest"  # (method, params, callback)
+  aj_location: "window.Aj.location"  # AJAX navigation
+  ads_module: "window.Ads"
+  events_module: "window.Events"
+
+# Regex to extract CSRF hash from inline <script>:
+csrf_extraction:
+  pattern: 'apiUrl":"\/api\?hash=([a-f0-9]+)"'
+  fallback_form_owner_id: "input[name='owner_id']"  # any hidden input on page

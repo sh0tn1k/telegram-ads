@@ -1,0 +1,26 @@
+# Campaign Decision Record
+
+ad_id: ""
+project_id: ""
+evidence_window: 0
+timestamp: ""
+
+metrics:
+  impressions: 0
+  clicks: 0
+  ctr: 0.0
+  spend: 0.0
+  cpm: 0.0
+  cpa: null
+  budget_utilization: 0.0
+  attribution_quality: "none"
+
+decision:
+  classification: ""  # insufficient_data | promising | underperforming | leading_candidate | stop_now
+  confidence: 0.0
+  recommended_action: ""  # continue_observing | propose_stop | propose_scale | reduce_cpm | replace_creative
+  approval_required: true
+  external_actions_allowed: false
+
+source_refs: []
+dedupe_reference: ""

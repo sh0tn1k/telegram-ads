@@ -1,0 +1,12 @@
+{
+  "name": "telegram-ads",
+  "version": "0.2.0",
+  "description": "Operate ads.telegram.org from the agent: typed tools, Playwright login, read-only watcher. MCP is a local stdio process — not a hosted server.",
+  "author": {
+    "name": "telegram-ads contributors"
+  },
+  "homepage": "https://github.com/sh0tn1k/telegram-ads",
+  "repository": "https://github.com/sh0tn1k/telegram-ads",
+  "license": "MIT",
+  "keywords": ["telegram", "ads", "playwright", "mcp"]
+}

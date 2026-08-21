@@ -1,0 +1,9 @@
+{
+  "telegram-ads": {
+    "command": "python",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp_stdio.py"],
+    "env": {
+      "TELEGRAM_ADS_PHONE": "${TELEGRAM_ADS_PHONE}"
+    }
+  }
+}

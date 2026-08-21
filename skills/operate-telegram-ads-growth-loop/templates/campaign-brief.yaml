@@ -1,0 +1,42 @@
+# Campaign Brief Template
+# Required fields marked with *
+
+campaign_id: ""           # * Unique campaign identifier
+project_id: ""            # * Project this campaign belongs to
+account_id: ""            # Telegram Ads account
+destination: ""           # * t.me/name or @handle
+destination_type: channel # channel | bot
+market: ""                # e.g. "English-US"
+language: ""              # * ISO language code
+geo_hypothesis: ""        # Target geography
+targeting_type: search    # * search | channels | bots
+audience_segment: ""      # Target audience description
+audience_intent: ""       # What the audience wants/needs
+funnel_stage: ""          # Awareness | Consideration | Conversion
+campaign_objective: ""    # * e.g. "drive bot starts"
+primary_kpi: ""           # * e.g. "CPA(start) < 3.0 ⭐"
+secondary_metrics: []     # Additional trackers
+
+search_queries: []        # Required for search targeting
+target_entities: []       # Required for channel/bot targeting
+target_cluster_id: ""     # Cluster reference
+
+query_hypothesis: ""      # Why these queries will work
+target_hypothesis: ""     # Why these targets will work
+creative_hypothesis: ""   # Why this creative will convert
+
+cpm_hypothesis: 0.0       # Expected CPM
+initial_budget: 0.0       # Starting budget
+maximum_approved_loss: 0.0  # * Maximum acceptable loss
+
+evidence_windows: [250, 500, 1000, 1500, 3000]
+stop_conditions: []       # * Conditions to stop
+continue_conditions: []   # Conditions to continue
+scale_conditions: []      # * Conditions to scale
+
+watcher_policy: {}        # Auto-generated from brief
+attribution_quality: none # none | weak | partial | strong
+destination_readiness: null  # Auto-populated by audit
+
+approval_requirements: []
+evidence_refs: []         # Source evidence
